@@ -32,8 +32,6 @@ var phrases = [
   "hey!! "
 ];
 
-build();
-
 function build() {
   tweet("@mangomya_ rebuilding database.");
   //spreadsheet id = 1MA1m2FVAorEpHLOi66o_Kv2Bqewim8CqFd5YvTexO4E
