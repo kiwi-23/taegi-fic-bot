@@ -11,9 +11,8 @@ var config = require("./config");
 var bot = new twit(config);
 
 var database = [];
+var mods = ["mangomya_", "TAEGINATION", "TAEGIRKlVE"];
 var index = 0;
-var built = true;
-var building = false;
 
 const database1 = new datastore("database.db");
 database1.loadDatabase();
@@ -33,7 +32,6 @@ var phrases = [
 ];
 
 function build() {
-  tweet("@mangomya_ rebuilding database.");
   //spreadsheet id = 1MA1m2FVAorEpHLOi66o_Kv2Bqewim8CqFd5YvTexO4E
   $.getJSON("https://spreadsheets.google.com/feeds/list/1MA1m2FVAorEpHLOi66o_Kv2Bqewim8CqFd5YvTexO4E/1/public/values?alt=json", function(data) {
     for (let i = 0; i < data.feed.entry.length; i++) {
@@ -54,9 +52,6 @@ function build() {
       if (index >= database.length) {
         clearInterval(rate);
         database1.insert(database);
-        building = false;
-        built = true;
-        tweet("@mangomya_ rebuild finished. database strength: " + database.length);
       }
     }, 1000 * 5);
   });
@@ -144,153 +139,141 @@ stream.on("tweet", function(tweetdata) {
       quote = true;
   }
   if (!quote && !tweetdata.retweeted_status) {
-    if (!building) {
-      database1.find({}, function(error, docs) {
-        if (docs.length == 0) {
-          building = true;
-          built = false;
-          tweet("@" + name + " the bot is temporarily down for daily restructuring :< please retry a little later.", tweetid);
-          build();
+    database1.find({}, function(error, docs) {
+      let valid = true;
+      let length = "";
+      let tags = [];
+      let text = tweetdata.text;
+      let index_l = text.search(/length/i);
+      if (index_l != -1) {
+        let start = text.indexOf("(", index_l);
+        let end = text.indexOf(")", index_l);
+        if (start != -1 && end != -1) {
+          length = text.substring(start + 1, end);
+          length = length.trim().toLowerCase();
         }
-        else {
-          let valid = true;
-          let length = "";
-          let tags = [];
-          let text = tweetdata.text;
-          let index_l = text.search(/length/i);
-          if (index_l != -1) {
-            let start = text.indexOf("(", index_l);
-            let end = text.indexOf(")", index_l);
-            if (start != -1 && end != -1) {
-              length = text.substring(start + 1, end);
-              length = length.trim().toLowerCase();
-            }
+        else
+          valid = false;
+      }
+      let index_t = text.search(/tags/i);
+      if (index_t != -1) {
+        let start = text.indexOf("(", index_t);
+        let end = text.indexOf(")", index_t);
+        if (start != -1 && end != -1) {
+          let tags_str = text.substring(start + 1, end);
+          let tags_arr = tags_str.split(",");
+          for (let i = 0; i < tags_arr.length; i++) {
+            let tag = tags_arr[i].trim().toLowerCase();
+            let words = [];
+            if (tag.search(" ") != -1)
+              words = tag.split(" ");
             else
-              valid = false;
+              words.push(tag);
+            tags.push(words);
           }
-          let index_t = text.search(/tags/i);
-          if (index_t != -1) {
-            let start = text.indexOf("(", index_t);
-            let end = text.indexOf(")", index_t);
-            if (start != -1 && end != -1) {
-              let tags_str = text.substring(start + 1, end);
-              let tags_arr = tags_str.split(",");
-              for (let i = 0; i < tags_arr.length; i++) {
-                let tag = tags_arr[i].trim().toLowerCase();
-                let words = [];
-                if (tag.search(" ") != -1)
-                  words = tag.split(" ");
-                else
-                  words.push(tag);
-                tags.push(words);
+        }
+        else
+          valid = false;
+      }
+      let poly = [
+        {
+          "ship": "taegijin",
+          "pairing": "Min Yoongi | Suga/Kim Seokjin | Jin/Kim Taehyung | V"
+        },
+        {
+          "ship": "taegiseok",
+          "pairing": "Jung Hoseok | J-Hope/Kim Taehyung | V/Min Yoongi | Suga"
+        },
+        {
+          "ship": "taegijoon",
+          "pairing": "Kim Namjoon | Rap Monster/Kim Taehyung | V/Min Yoongi | Suga"
+        },
+        {
+          "ship": "taegimin",
+          "pairing": "Kim Taehyung | V/Min Yoongi | Suga/Park Jimin"
+        },
+        {
+          "ship": "taegikook",
+          "pairing": "Jeon Jungkook/Kim Taehyung | V/Min Yoongi | Suga"
+        }
+      ];
+      let threshold1 = 0;
+      let threshold2 = Infinity;
+      if (length == "short")
+        threshold2 = 5000;
+      else if (length == "average") {
+        threshold1 = 5000;
+        threshold2 = 20000;
+      }
+      else if (length == "long") {
+        threshold1 = 20000;
+        threshold2 = 50000;
+      }
+      else if (length == "epic")
+        threshold1 = 50000;
+      else if (length != "")
+        valid = false;
+      if (valid == true) {
+        let parameters = {
+          $and: [
+            {
+              length: {
+                $gt: threshold1,
+                $lt: threshold2
+              },
+            }
+          ]
+        };
+        let obj1 = {};
+        obj1["$and"] = [];
+        for (let i = 0; i < tags.length; i++) {
+          let obj2 = {};
+          tags[i][0] = tags[i][0].toLowerCase();
+          for (let j = 0; j < poly.length; j++) {
+            if (tags[i][0] === poly[j].ship) {
+              obj2.ships = {};
+              obj2.ships["$elemMatch"] = poly[j].pairing;
+              break;
+            }
+          }
+          if (!obj2.ships) {
+            obj2.tags = {};
+            obj2.tags["$elemMatch"] = {};
+            obj2.tags["$elemMatch"]["$and"] = [];
+            for (let j = 0; j < tags[i].length; j++) {
+              let obj3 = {};
+              obj3.tag = new RegExp(tags[i][j]);
+              obj2.tags["$elemMatch"]["$and"].push(obj3);
+            }
+          }
+          obj1["$and"].push(obj2);
+        }
+        parameters["$and"].push(obj1);
+        database1.find(parameters, function (error, docs) {
+          let reply = "@" + name + " " + phrases[Math.floor(Math.random() * phrases.length)];
+          if (docs.length > 0) {
+            let fics = [];
+            if (docs.length <= 3)
+              fics = docs;
+            else {
+              for (let i = 0; i < 3; i++) {
+                let index = Math.floor(Math.random() * docs.length);
+                fics.push(docs[index]);
+                docs.splice(index, 1);
               }
             }
-            else
-              valid = false;
-          }
-          let poly = [
-            {
-              "ship": "taegijin",
-              "pairing": "Min Yoongi | Suga/Kim Seokjin | Jin/Kim Taehyung | V"
-            },
-            {
-              "ship": "taegiseok",
-              "pairing": "Jung Hoseok | J-Hope/Kim Taehyung | V/Min Yoongi | Suga"
-            },
-            {
-              "ship": "taegijoon",
-              "pairing": "Kim Namjoon | Rap Monster/Kim Taehyung | V/Min Yoongi | Suga"
-            },
-            {
-              "ship": "taegimin",
-              "pairing": "Kim Taehyung | V/Min Yoongi | Suga/Park Jimin"
-            },
-            {
-              "ship": "taegikook",
-              "pairing": "Jeon Jungkook/Kim Taehyung | V/Min Yoongi | Suga"
+            for (let i = 0; i < fics.length; i++) {
+              reply += "\n" + fics[i].link;
             }
-          ];
-          let threshold1 = 0;
-          let threshold2 = Infinity;
-          if (length == "short")
-            threshold2 = 5000;
-          else if (length == "average") {
-            threshold1 = 5000;
-            threshold2 = 20000;
-          }
-          else if (length == "long") {
-            threshold1 = 20000;
-            threshold2 = 50000;
-          }
-          else if (length == "epic")
-            threshold1 = 50000;
-          else if (length != "")
-            valid = false;
-          if (valid == true) {
-            let parameters = {
-              $and: [
-                {
-                  length: {
-                    $gt: threshold1,
-                    $lt: threshold2
-                  },
-                }
-              ]
-            };
-            let obj1 = {};
-            obj1["$and"] = [];
-            for (let i = 0; i < tags.length; i++) {
-              let obj2 = {};
-              tags[i][0] = tags[i][0].toLowerCase();
-              for (let j = 0; j < poly.length; j++) {
-                if (tags[i][0] === poly[j].ship) {
-                  obj2.ships = {};
-                  obj2.ships["$elemMatch"] = poly[j].pairing;
-                  break;
-                }
-              }
-              if (!obj2.ships) {
-                obj2.tags = {};
-                obj2.tags["$elemMatch"] = {};
-                obj2.tags["$elemMatch"]["$and"] = [];
-                for (let j = 0; j < tags[i].length; j++) {
-                  let obj3 = {};
-                  obj3.tag = new RegExp(tags[i][j]);
-                  obj2.tags["$elemMatch"]["$and"].push(obj3);
-                }
-              }
-              obj1["$and"].push(obj2);
-            }
-            parameters["$and"].push(obj1);
-            database1.find(parameters, function (error, docs) {
-              let reply = "@" + name + " " + phrases[Math.floor(Math.random() * phrases.length)];
-              if (docs.length > 0) {
-                let fics = [];
-                if (docs.length <= 3)
-                  fics = docs;
-                else {
-                  for (let i = 0; i < 3; i++) {
-                    let index = Math.floor(Math.random() * docs.length);
-                    fics.push(docs[index]);
-                    docs.splice(index, 1);
-                  }
-                }
-                for (let i = 0; i < fics.length; i++) {
-                  reply += "\n" + fics[i].link;
-                }
-                tweet(reply, tweetid);
-              }
-              else
-                tweet("@" + name + " your query did not match any result :< please try a more general search.", tweetid);
-            });
+            tweet(reply, tweetid);
           }
           else
-            tweet("@" + name + " something went wrong :< please check your syntax again.", tweetid);
-        }
-      });
-    }
-    else
-      tweet("@" + name + " the bot is temporarily down for daily restructuring :< please retry a little later.", tweetid);
+            tweet("@" + name + " your query did not match any result :< please try a more general search.", tweetid);
+        });
+      }
+      else
+        tweet("@" + name + " something went wrong :< please check your syntax again.", tweetid);
+    });
   }
 });
 
