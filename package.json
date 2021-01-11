@@ -10,10 +10,11 @@
   "author": "@mangomya_",
   "license": "ISC",
   "dependencies": {
-    "axios": "^0.20.0",
+    "axios": "^0.21.1",
     "cheerio": "^1.0.0-rc.3",
-    "jquery": "^3.5.1",
+    "firebase": "^8.2.2",
     "jsdom": "^16.4.0",
+    "jquery": "^3.5.1",
     "nedb": "^1.8.0",
     "twit": "^2.2.11"
   }
